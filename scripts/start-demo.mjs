@@ -12,6 +12,7 @@ const isDryRun = process.argv.includes('--dry-run');
 
 assertSupportedNodeVersion();
 ensureDependenciesInstalled();
+printRunGuide();
 
 if (isDryRun) {
   console.log('Dry run complete. Startup prerequisites are ready.');
@@ -62,6 +63,18 @@ function ensureDependenciesInstalled() {
   if (installer.status !== 0) {
     process.exit(installer.status ?? 1);
   }
+}
+
+function printRunGuide() {
+  console.log('');
+  console.log('Usage guide');
+  console.log('1. The browser will open http://127.0.0.1:5173 automatically.');
+  console.log('2. Allow camera access to enable head tracking and gesture recognition.');
+  console.log('3. Move your head left/right/up/down to inspect the fixed cube and room box.');
+  console.log('4. Single-hand pinch rotates the cube; dual-hand pinch scales and twists it.');
+  console.log('5. If the camera is unavailable, the demo will fall back to mouse preview mode.');
+  console.log('6. Press Ctrl+C in this terminal when you want to stop the demo.');
+  console.log('');
 }
 
 function isLockfileNewerThanInstalledState() {
