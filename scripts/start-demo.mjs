@@ -1,16 +1,19 @@
-import { existsSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { delimiter, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawn, spawnSync } from 'node:child_process';
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDir, '..');
-const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const nodeBinDir = dirname(process.execPath);
 const packageLockPath = join(projectRoot, 'package-lock.json');
 const installedLockPath = join(projectRoot, 'node_modules', '.package-lock.json');
+const startupLogPath = join(projectRoot, 'artifacts', 'startup', 'last-install.log');
 const isDryRun = process.argv.includes('--dry-run');
+const spawnEnv = createSpawnEnv();
 
 assertSupportedNodeVersion();
+const npmCommand = resolveNpmCommand();
 ensureDependenciesInstalled();
 printRunGuide();
 
@@ -51,18 +54,39 @@ function ensureDependenciesInstalled() {
     return;
   }
 
-  const installArgs = ['ci'];
-  const installLabel = 'Installing dependencies for the first run...';
+  const installAttempts = [
+    {
+      args: ['ci', '--no-fund', '--no-audit'],
+      label: 'Installing dependencies for the first run with npm ci...',
+    },
+    {
+      args: ['install', '--no-fund', '--no-audit'],
+      label: 'npm ci did not complete successfully. Trying npm install as a compatibility fallback...',
+    },
+  ];
 
-  console.log(installLabel);
-  const installer = spawnSync(npmCommand, installArgs, {
-    cwd: projectRoot,
-    stdio: 'inherit',
-  });
+  for (const [index, attempt] of installAttempts.entries()) {
+    console.log(attempt.label);
+    const installer = runNpmCommandSync(attempt.args, {
+      cwd: projectRoot,
+      stdio: 'inherit',
+    });
 
-  if (installer.status !== 0) {
-    process.exit(installer.status ?? 1);
+    if (installer.error) {
+      reportInstallFailure(attempt.args, installer);
+      process.exit(1);
+    }
+
+    if (installer.status === 0) {
+      if (index > 0) {
+        console.log('Dependencies were installed successfully by the fallback installer.');
+      }
+      return;
+    }
   }
+
+  reportInstallFailure(installAttempts.at(-1)?.args ?? ['install'], { status: 1 });
+  process.exit(1);
 }
 
 function printRunGuide() {
@@ -77,6 +101,138 @@ function printRunGuide() {
   console.log('');
 }
 
+function resolveNpmCommand() {
+  const candidates = process.platform === 'win32'
+    ? ['npm.cmd', 'npm']
+    : [
+        join(nodeBinDir, 'npm'),
+        'npm',
+      ];
+
+  for (const candidate of candidates) {
+    const isAbsoluteCandidate = candidate.includes(nodeBinDir);
+    if (isAbsoluteCandidate && !existsSync(candidate)) {
+      continue;
+    }
+
+    const probe = process.platform === 'win32'
+      ? spawnSync(`${candidate} --version`, {
+          cwd: projectRoot,
+          stdio: 'pipe',
+          encoding: 'utf8',
+          shell: true,
+          env: spawnEnv,
+        })
+      : spawnSync(candidate, ['--version'], {
+          cwd: projectRoot,
+          stdio: 'pipe',
+          encoding: 'utf8',
+          env: spawnEnv,
+        });
+
+    if (!probe.error && probe.status === 0) {
+      return candidate;
+    }
+  }
+
+  console.error('npm could not be found even though Node.js is available.');
+  console.error(`Node executable: ${process.execPath}`);
+  console.error('Please reinstall Node.js from https://nodejs.org/ and then run start-demo.bat again.');
+  process.exit(1);
+}
+
+function createSpawnEnv() {
+  const env = { ...process.env };
+  const pathKey = Object.keys(env).find((key) => key.toLowerCase() === 'path') ?? 'PATH';
+  const currentEntries = (env[pathKey] ?? '').split(delimiter).filter(Boolean);
+
+  if (!currentEntries.includes(nodeBinDir)) {
+    env[pathKey] = [nodeBinDir, ...currentEntries].join(delimiter);
+  }
+
+  env.npm_config_audit = 'false';
+  env.npm_config_fund = 'false';
+
+  return env;
+}
+
+function runNpmCommandSync(args, options = {}) {
+  if (process.platform === 'win32') {
+    return spawnSync(`npm.cmd ${args.join(' ')}`, {
+      ...options,
+      shell: true,
+      env: {
+        ...spawnEnv,
+        ...(options.env ?? {}),
+      },
+    });
+  }
+
+  return spawnSync(npmCommand, args, {
+    ...options,
+    env: {
+      ...spawnEnv,
+      ...(options.env ?? {}),
+    },
+  });
+}
+
+function spawnNpmCommand(args, options = {}) {
+  if (process.platform === 'win32') {
+    return spawn(`npm.cmd ${args.join(' ')}`, {
+      ...options,
+      shell: true,
+      env: {
+        ...spawnEnv,
+        ...(options.env ?? {}),
+      },
+    });
+  }
+
+  return spawn(npmCommand, args, {
+    ...options,
+    env: {
+      ...spawnEnv,
+      ...(options.env ?? {}),
+    },
+  });
+}
+
+function reportInstallFailure(args, result) {
+  const lines = [
+    `Timestamp: ${new Date().toISOString()}`,
+    `Node version: ${process.versions.node}`,
+    `Node executable: ${process.execPath}`,
+    `Resolved npm command: ${npmCommand}`,
+    `Attempted command: ${[npmCommand, ...args].join(' ')}`,
+    `Exit status: ${result.status ?? 'null'}`,
+    `Signal: ${result.signal ?? 'none'}`,
+  ];
+
+  if (result.error) {
+    lines.push(`Launch error: ${result.error.message}`);
+    if (result.error.stack) {
+      lines.push('');
+      lines.push(result.error.stack);
+    }
+  }
+
+  mkdirSync(dirname(startupLogPath), { recursive: true });
+  writeFileSync(startupLogPath, `${lines.join('\n')}\n`, 'utf8');
+
+  console.error('');
+  console.error('Dependency installation did not complete successfully.');
+  console.error(`A startup log was written to: ${startupLogPath}`);
+
+  if (result.error) {
+    console.error(`Installer launch error: ${result.error.message}`);
+    console.error('This usually means npm is not available on PATH or was not installed with Node.js.');
+  } else {
+    console.error('The npm installer exited with a non-zero code.');
+    console.error('Please open the log above and rerun the command in a terminal to see the full npm output.');
+  }
+}
+
 function isLockfileNewerThanInstalledState() {
   if (!existsSync(packageLockPath) || !existsSync(installedLockPath)) {
     return true;
@@ -88,9 +244,15 @@ function isLockfileNewerThanInstalledState() {
 function startDevServer() {
   console.log('Starting local demo server at http://127.0.0.1:5173 ...');
 
-  const child = spawn(npmCommand, ['run', 'dev:open'], {
+  const child = spawnNpmCommand(['run', 'dev:open'], {
     cwd: projectRoot,
     stdio: 'inherit',
+  });
+
+  child.on('error', (error) => {
+    console.error('The local dev server could not be started.');
+    console.error(error.message);
+    process.exit(1);
   });
 
   child.on('exit', (code) => {

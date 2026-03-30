@@ -45,11 +45,13 @@
 5. 如果 `winget` 不可用，脚本会继续尝试下载官方 Node.js 安装包并自动安装。
 6. Node 就绪后，再调用 `node scripts/start-demo.mjs`。
 7. `start-demo.mjs` 会检查依赖；如果本地还没有可用依赖，会自动执行 `npm ci` 完成首次安装。
-8. 如果本地依赖已经存在，则直接复用当前依赖，避免在 Windows 上因为文件占用导致重装失败。
-9. 接着启动 `vite` 开发服务器。
-10. 最后自动打开浏览器并进入本地页面。
+8. 如果 `npm ci` 因环境差异没有成功，脚本会自动再尝试一次 `npm install` 作为兼容性回退。
+9. 如果本地依赖已经存在，则直接复用当前依赖，避免在 Windows 上因为文件占用导致重装失败。
+10. 接着启动 `vite` 开发服务器。
+11. 最后自动打开浏览器并进入本地页面。
 
 如果脚本无法自动安装 Node.js，它会自动打开 Node 官方下载页，并提示你完成安装后重新双击 `start-demo.bat`。
+如果依赖安装失败，启动器还会把定位信息写入 `artifacts/startup/last-install.log`，方便快速判断是 `npm` 未找到、网络问题还是权限问题。
 
 默认会打开本地地址：`http://127.0.0.1:5173`
 
@@ -181,6 +183,7 @@ npm run preview:open
 - Windows 是否支持 `winget`
 - 系统是否允许安装程序弹窗
 - 安装 Node 时是否被安全软件拦截
+- 查看 `artifacts/startup/last-install.log`，确认是 `npm` 未找到还是依赖安装失败
 
 如果自动安装失败，脚本会自动打开 Node 官方下载页。安装完成后重新双击 `start-demo.bat` 即可。
 
@@ -203,4 +206,3 @@ npm run preview:open
 ├─ package.json
 └─ vite.config.js
 ```
-
