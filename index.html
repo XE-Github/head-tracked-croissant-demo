@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Head Tracked Project Window</title>
+    <script type="module" src="/src/main.js"></script>
+  </head>
+  <body>
+    <div id="app">
+      <div id="scene-shell">
+        <div id="project-root" aria-label="头部跟踪 3D 视窗"></div>
+        <div id="gesture-overlay" data-mode="idle" aria-hidden="true">
+          <div id="gesture-anchor"></div>
+          <div id="gesture-link"></div>
+          <div class="gesture-cursor" id="gesture-cursor-left"></div>
+          <div class="gesture-cursor" id="gesture-cursor-right"></div>
+        </div>
+        <div id="viewport-glass"></div>
+        <video id="camera-feed" autoplay playsinline muted></video>
+        <div id="status-pill">正在初始化项目...</div>
+        <div id="gesture-status" data-mode="loading" aria-live="polite">
+          <span class="gesture-label">Gesture</span>
+          <strong id="gesture-status-title">初始化中</strong>
+          <span id="gesture-status-detail">正在准备手势识别...</span>
+        </div>
+      </div>
+
+      <aside id="control-panel">
+        <div class="panel-header">
+          <p class="eyebrow">Head Tracked Demo</p>
+          <h1>固定方块 + 空间视窗</h1>
+          <p class="panel-copy">
+            当前版本模拟的是一个固定在空间盒子中央的物体。头部上下左右移动时，视窗像真实窗口一样改变观察视角；手势只负责旋转和缩放方块，不干扰头部透视。
+          </p>
+        </div>
+
+        <p class="panel-section-title">基础设定</p>
+
+        <div class="control">
+          <div class="control-copy">
+            <label for="tracking-response">跟踪响应</label>
+            <p class="control-help">控制视角跟随头部的速度。数值越高越跟手，数值越低越平稳。</p>
+          </div>
+          <output id="tracking-response-value">0.22</output>
+          <input id="tracking-response" type="range" min="0.08" max="0.45" step="0.01" value="0.22" />
+        </div>
+
+        <div class="control">
+          <div class="control-copy">
+            <label for="tracking-ahead">前馈补偿</label>
+            <p class="control-help">根据最近一帧头部运动趋势，轻微提前视角变化，用来减小延迟感。</p>
+          </div>
+          <output id="tracking-ahead-value">0.42</output>
+          <input id="tracking-ahead" type="range" min="0.00" max="0.90" step="0.02" value="0.42" />
+        </div>
+
+        <div class="control">
+          <div class="control-copy">
+            <label for="head-range">头部位移幅度</label>
+            <p class="control-help">放大或缩小头部上下左右移动对视角的影响范围。</p>
+          </div>
+          <output id="head-range-value">1.05</output>
+          <input id="head-range" type="range" min="0.45" max="2.20" step="0.05" value="1.05" />
+        </div>
+
+        <div class="control">
+          <div class="control-copy">
+            <label for="perspective-strength">透视强度</label>
+            <p class="control-help">控制空间盒子和中心方块的视角变化有多明显。</p>
+          </div>
+          <output id="perspective-strength-value">1.20</output>
+          <input id="perspective-strength" type="range" min="0.60" max="2.40" step="0.05" value="1.20" />
+        </div>
+
+        <div class="control">
+          <div class="control-copy">
+            <label for="room-depth">空间盒子深度</label>
+            <p class="control-help">调节视窗内部空间盒子的纵深长度，让透视层次更强或更紧凑。</p>
+          </div>
+          <output id="room-depth-value">10.0</output>
+          <input id="room-depth" type="range" min="6.0" max="16.0" step="0.5" value="10.0" />
+        </div>
+
+        <div class="control">
+          <div class="control-copy">
+            <label for="framing-zoom">视窗取景</label>
+            <p class="control-help">控制当前窗口像看进去的开口大小，影响整体构图和压迫感。</p>
+          </div>
+          <output id="framing-zoom-value">1.00</output>
+          <input id="framing-zoom" type="range" min="0.80" max="1.25" step="0.01" value="1.00" />
+        </div>
+
+        <div class="toggle-control">
+          <div class="control-copy">
+            <label for="gesture-enabled">手势操控</label>
+            <p class="control-help">开启后可用捏合手势旋转或缩放中心方块，不影响头部透视。</p>
+          </div>
+          <input id="gesture-enabled" type="checkbox" checked />
+        </div>
+
+        <p class="panel-note">
+          单手捏合可旋转中心方块，双手同时捏合可缩放并扭转方块。头部移动始终只负责观察视角，不再驱动方块漂移或放大缩小。
+        </p>
+
+        <div class="button-row">
+          <button id="fullscreen-toggle" type="button">进入全屏</button>
+          <button id="recenter-view" type="button">重新居中</button>
+          <button id="reset-object" type="button">重置物体</button>
+        </div>
+
+        <p id="tracking-state" class="panel-note">等待摄像头授权...</p>
+      </aside>
+    </div>
+  </body>
+</html>

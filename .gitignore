@@ -1,0 +1,14 @@
+node_modules/
+dist/
+artifacts/
+releases/
+test-results/
+.learnings/
+.preview*.log
+.preview*.err.log
+.package-preview*.log
+.package-preview*.err.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
