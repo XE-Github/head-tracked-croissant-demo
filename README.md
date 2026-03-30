@@ -176,19 +176,3 @@ npm run preview:open
 └─ vite.config.js
 ```
 
-## GitHub 发布建议
-
-项目已经补好 `.gitignore`，默认不会把这些内容推上去：
-- `node_modules`
-- `dist`
-- `artifacts`
-- `releases`
-- 本地预览日志
-
-公开发布到 GitHub 前，建议你再补一项：
-- 选择并添加一个 `LICENSE` 文件
-
-如果你愿意，我下一步可以继续帮你补：
-- 英文版 README
-- LICENSE
-- GitHub Actions 自动构建 / 自动校验
